@@ -115,6 +115,11 @@ as a bug, not a nit.
 - Simplified-Chinese UI + the **Language** setting (`src/i18n/**`,
   `Settings → Appearance → 语言`, the `paperling:locale-change` event).
 - Local-build fix (`bun run build:local`, `src-tauri/tauri.local.conf.json`).
+  The script starts the CLI entry point with bun (`bun
+  node_modules/@tauri-apps/cli/tauri.js …`) instead of the `tauri` bin: under
+  bun's `node_modules/.bin` shim, WiX `light.exe`'s ICE validation fails on
+  Windows (`LGHT0217` / `0x643`, "The Windows Installer Service could not be
+  accessed") even though the identical command exits 0 when run directly.
 - The non-ASCII image-path fix (`src/utils/resolveRelativePath`,
   `MarkdownPreview` decoding).
 
