@@ -24,11 +24,15 @@ interface ExportMenuProps {
     onError?: (format: string) => void;
     /** Copy the rendered document: rich text, or its HTML source. COPY-02. */
     onCopy?: (kind: "rich" | "html") => void;
+    /** Keep the menu shut while there is no rendered document to capture (PERF-03). */
+    disabled?: boolean;
+    /** Tooltip explaining why the menu is shut, e.g. a note too large to preview. */
+    disabledReason?: string;
 }
 
 type ExportFormat = 'html' | 'pdf' | 'docx';
 
-export function ExportMenu({ fileName, getExportHtml, onSuccess, onError, onCopy }: ExportMenuProps) {
+export function ExportMenu({ fileName, getExportHtml, onSuccess, onError, onCopy, disabled: disabledByParent = false, disabledReason }: ExportMenuProps) {
     const { t } = useI18n();
     const [isOpen, setIsOpen] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
@@ -59,7 +63,7 @@ export function ExportMenu({ fileName, getExportHtml, onSuccess, onError, onCopy
         };
     }, [isOpen]);
 
-    const disabled = !getExportHtml;
+    const disabled = disabledByParent || !getExportHtml;
 
     const handleExport = async (format: ExportFormat) => {
         if (isExporting || !getExportHtml) return;
@@ -68,6 +72,10 @@ export function ExportMenu({ fileName, getExportHtml, onSuccess, onError, onCopy
         // the preview debounce and waits a frame, so it's async (EXPORT-03).
         const htmlContent = await getExportHtml();
         if (!htmlContent) {
+            // Nothing to capture (no file, preview still rendering, or a
+            // suppressed large-document preview): shut the menu so the toast
+            // is not left hanging under it.
+            setIsOpen(false);
             onError?.(t("exportMenu.nothing"));
             return;
         }
@@ -115,7 +123,7 @@ export function ExportMenu({ fileName, getExportHtml, onSuccess, onError, onCopy
                 // Muted color at full opacity when disabled rather than a
                 // faded button — keeps the label readable (a11y).
                 className={`chrome-btn flex items-center gap-1 px-2 h-8 text-xs ${disabled ? 'cursor-not-allowed !text-[var(--text-muted)]' : ''}`}
-                title={t("exportMenu.ariaLabel")}
+                title={disabled ? (disabledReason ?? t("exportMenu.ariaLabel")) : t("exportMenu.ariaLabel")}
             >
                 {isExporting ? (
                     <>

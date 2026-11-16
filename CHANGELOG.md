@@ -26,6 +26,13 @@ dialog show, so keep it to a handful of lines and link to the full notes in
 
 ### Fixed
 
+- **A very large note no longer freezes the reader (PERF-03).** Opening a 6 MB
+  Markdown file used to block the window for about a minute while the preview
+  built hundreds of thousands of elements, so even the close button stopped
+  responding. Notes over 1 MB now show a "too large to preview" card with their
+  size and two one-click ways forward: open the source view instantly, or render
+  the preview anyway if you want it. Export and copy stay off until the preview
+  is rendered, with a tooltip saying why.
 - **A local build no longer ends in a red error.** Building on a machine that
   has the updater public key but not its private key wrote both installers and
   *then* failed with "A public key has been found, but no private key" and exit

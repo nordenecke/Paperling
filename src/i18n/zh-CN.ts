@@ -101,6 +101,7 @@ const zhCN: Dict = {
         exportedAs: "已导出为 {format}",
         exportFailed: "导出 {format} 失败",
         couldNotExportHtml: "无法导出 HTML",
+        previewNotRendered: "这篇笔记有 {size}，尚未渲染，请先打开预览再导出",
         exportedHtmlToDownloads: "已把“{title}.html”导出到下载文件夹",
         printNeedsReader: "请在阅读或分栏视图中打开文档后再打印",
         printUnavailable: "这里无法打印 —— 请改用「导出 → PDF」",
@@ -222,6 +223,16 @@ const zhCN: Dict = {
         footnote: "阅读时间按每分钟约 200 词估算。词数与句子数不含代码块、frontmatter 和 Markdown 语法。",
     },
 
+    // 阅读模式的体积保护：超大文档不直接渲染，先说明代价并给两个出口。
+    preview: {
+        largeTitle: "这篇笔记太大，无法直接预览",
+        largeBody:
+            "文档大小为 {size}。在阅读模式中完整渲染需要一次性构建数十万个元素，Paperling 会冻结约一分钟。",
+        largeOpenSource: "打开源码视图",
+        largeRenderAction: "仍然渲染预览",
+        largeHint: "源码视图可立即打开并编辑；渲染预览可能需要一分钟，并占用数百 MB 内存。",
+    },
+
     statusBar: {
         bar: "状态栏",
         filesTitle: "文件（Ctrl+Shift+E）",
@@ -329,6 +340,7 @@ const zhCN: Dict = {
         copyRich: "复制为富文本",
         copyHtml: "复制为 HTML",
         copyRichTitle: "粘贴到 Word、Gmail 或 Google 文档时保留格式",
+        renderFirst: "先渲染预览，才能导出这篇笔记",
     },
 
     // 文件的旧版本（HIST-01）。

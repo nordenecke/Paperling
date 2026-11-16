@@ -20,6 +20,11 @@ interface TitleBarProps {
     getExportHtml?: () => Promise<string>;
     /** False hides Export: an HTML page has no Markdown render to export. */
     canExport?: boolean;
+    /** Shuts the Export menu while the Reader holds a size notice instead of
+     *  the document, so there is no rendered HTML to capture (PERF-03). */
+    exportDisabled?: boolean;
+    /** Tooltip for the shut Export button. */
+    exportDisabledReason?: string;
     onCopyDocument?: (kind: "rich" | "html") => void;
     onExportSuccess?: (format: string) => void;
     onExportError?: (format: string) => void;
@@ -38,7 +43,7 @@ interface TitleBarProps {
     onPrint?: () => void;
 }
 
-function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onOpenFolder, onOpenRecent, onNewFile, getExportHtml, canExport = true, onCopyDocument, onExportSuccess, onExportError, onToggleAI, aiActive, isFullscreen, onToggleFullscreen, onFind, onReplace, onFindInFiles, onSave, onSaveAs, onPrint }: TitleBarProps) {
+function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onOpenFolder, onOpenRecent, onNewFile, getExportHtml, canExport = true, exportDisabled = false, exportDisabledReason, onCopyDocument, onExportSuccess, onExportError, onToggleAI, aiActive, isFullscreen, onToggleFullscreen, onFind, onReplace, onFindInFiles, onSave, onSaveAs, onPrint }: TitleBarProps) {
     const { t } = useI18n();
     // Whether the AI button's icon shimmers. Some users prefer it plain (#111).
     // Held locally and refreshed from the Settings event rather than threaded
@@ -215,6 +220,8 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onOpenFolder, o
                                     onSuccess={onExportSuccess}
                                     onError={onExportError}
                                     onCopy={onCopyDocument}
+                                    disabled={exportDisabled}
+                                    disabledReason={exportDisabledReason}
                                 />
                             )}
                             {onFind && onReplace && onFindInFiles && (

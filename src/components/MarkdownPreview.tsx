@@ -29,6 +29,8 @@ import { getRemoteImages, getReaderEditing } from "../utils/persistence";
 import { useReaderEditor } from "../hooks/useReaderEditor";
 import { matchesBinding } from "../config/keybindings";
 import { orderedListMarkerCharacters } from "../utils/orderedListMarkers";
+import { formatBytes } from "../utils/largeFile";
+import { useI18n } from "../i18n";
 
 function OrderedList({ node, children, style, ...props }: React.ComponentProps<"ol"> & ExtraProps) {
     const values = (node?.children ?? []).flatMap((child) =>
@@ -288,6 +290,13 @@ interface MarkdownPreviewProps {
     /** The text last selected in the reader and its content-relative source
      *  line (null when cleared), so Ctrl+E can put the caret on it. MODE-03. */
     onReaderSelection?: (sel: { line: number; text: string } | null) => void;
+    /** The document is past the Reader size limit (PERF-03): show the size
+     *  notice instead of parsing the body, so opening the note stays instant.
+     *  App owns the decision because export/print need the same answer. */
+    previewSuppressed?: boolean;
+    /** "Render preview anyway" on that notice: App clears the suppression and
+     *  accepts the one-off freeze the user just opted into. */
+    onRequestPreview?: () => void;
 }
 
 /* ---------- Wikilink pre-processing (NAV-08) ---------- */
@@ -903,8 +912,62 @@ const MarkdownBlock = memo(function MarkdownBlock({
     );
 });
 
+/* ---------- Reader size notice (PERF-03) ---------- */
+
+/**
+ * Shown instead of the body when the note is past PREVIEW_SIZE_LIMIT_BYTES.
+ * Both ways forward are one click: the source view (instant, editable) and an
+ * explicit opt-in to the render, which the user can still abort by closing
+ * the tab while it runs.
+ */
+function LargeFileNotice({ bytes, onOpenSource, onRequestPreview }: {
+    bytes: number;
+    onOpenSource: () => void;
+    onRequestPreview?: () => void;
+}) {
+    const { t } = useI18n();
+    return (
+        <div
+            className="mx-auto max-w-xl px-6 py-16 text-center"
+            role="note"
+            // The Reader's editing gestures must not treat this card as text.
+            onPointerDown={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
+        >
+            <span className="material-symbols-outlined text-[40px] text-[var(--text-muted)]" aria-hidden="true">
+                description
+            </span>
+            <h2 className="mt-3 text-lg font-semibold text-[var(--text-primary)]">{t("preview.largeTitle")}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
+                {t("preview.largeBody", { size: formatBytes(bytes) })}
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                {onRequestPreview && (
+                    <button
+                        type="button"
+                        onClick={onRequestPreview}
+                        className="px-3 py-1.5 text-sm rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-text)] hover:opacity-90"
+                    >
+                        {t("preview.largeRenderAction")}
+                    </button>
+                )}
+                <button
+                    type="button"
+                    onClick={onOpenSource}
+                    className="px-3 py-1.5 text-sm rounded-[var(--radius-md)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]"
+                >
+                    {t("preview.largeOpenSource")}
+                </button>
+            </div>
+            <p className="mt-4 text-xs text-[var(--text-muted)]">{t("preview.largeHint")}</p>
+        </div>
+    );
+}
+
 function MarkdownPreviewImpl({
     content,
+    fileSize,
+    onEditClick,
     liveContent,
     allowReaderEditing = true,
     onLineChange,
@@ -920,6 +983,8 @@ function MarkdownPreviewImpl({
     onRendered,
     docKey = null,
     onReaderSelection,
+    previewSuppressed = false,
+    onRequestPreview,
 }: MarkdownPreviewProps) {
     const mainRef = useRef<HTMLElement>(null);
     // Per-tab reading positions (see the SWITCH-01 layout effect below).
@@ -1307,7 +1372,13 @@ function MarkdownPreviewImpl({
 
     // Top-level blocks of the body (null = render it whole, e.g. footnotes).
     // PERF-02.
-    const blocks = useMemo(() => splitMarkdownBlocks(renderedBody), [renderedBody]);
+    const blocks = useMemo(
+        // Suppressed (PERF-03): splitting a multi-MB body is pure waste — the
+        // body is never rendered. The empty list keeps the JSX branch below
+        // from falling into the whole-document path.
+        () => (previewSuppressed ? [] : splitMarkdownBlocks(renderedBody)),
+        [renderedBody, previewSuppressed],
+    );
     const tocValue = useMemo(
         () => ({
             markdown: /\[toc\]/i.test(renderedBody) ? tocMarkdown(renderedBody) : "",
@@ -1642,7 +1713,7 @@ function MarkdownPreviewImpl({
                     wide code block can leave the reading column. RLL-02. */}
                 <div className="preview-clip">
                 <div className={`preview-column ${readableLineLength ? "max-w-[800px] mx-auto" : "w-full"} px-8 pt-12 pb-28`}>
-                    {hasFrontmatter && (
+                    {hasFrontmatter && !previewSuppressed && (
                         <FrontmatterCard
                             data={frontmatter}
                             editable={!!onContentChange && !editingBlock}
@@ -1685,7 +1756,15 @@ function MarkdownPreviewImpl({
                         }}
                     >
                         <TocContext.Provider value={tocValue}>
-                        {blocks ? (
+                        {previewSuppressed ? (
+                            // PERF-03: the body is not parsed at all here, so
+                            // a 6 MB note opens as fast as an empty one.
+                            <LargeFileNotice
+                                bytes={Math.max(fileSize, content.length)}
+                                onOpenSource={onEditClick}
+                                onRequestPreview={onRequestPreview}
+                            />
+                        ) : blocks ? (
                             // Block-by-block (PERF-02): each wrapper is
                             // display:contents (no layout box) and carries the
                             // block's line offset; the memoized block only

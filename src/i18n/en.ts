@@ -108,6 +108,7 @@ const en = {
         exportedAs: "Exported as {format}",
         exportFailed: "Failed to export {format}",
         couldNotExportHtml: "Could not export HTML",
+        previewNotRendered: "This {size} note wasn't rendered — open the preview first, then export",
         exportedHtmlToDownloads: "Exported \"{title}.html\" to Downloads",
         printNeedsReader: "Open the document in Reader or Split view to print it",
         printUnavailable: "Printing isn't available here — use Export → PDF instead",
@@ -234,6 +235,19 @@ const en = {
         footnote: "Reading time assumes ~200 words per minute. Word and sentence counts exclude code blocks, frontmatter, and Markdown syntax.",
     },
 
+    // Reader size guard (PERF-03): shown instead of the body for notes too
+    // large to render without freezing the window. "Open source view" and
+    // "Render preview anyway" are the two ways forward.
+    preview: {
+        largeTitle: "This note is too large to preview",
+        largeBody:
+            "The document is {size}. Rendering it in the Reader builds hundreds of thousands of elements in one pass and would freeze Paperling for about a minute.",
+        largeOpenSource: "Open source view",
+        largeRenderAction: "Render preview anyway",
+        largeHint:
+            "The source view opens instantly and can edit the note. Rendering the preview may take a minute and several hundred MB of memory.",
+    },
+
     // The footer: save state, Ln/Col, word and character counts, reading time.
     // The counts and the reading time are functions because they inflect
     // (English "1 word" / "3 words"); Chinese does not.
@@ -350,6 +364,7 @@ const en = {
         copyRich: "Copy as rich text",
         copyHtml: "Copy as HTML",
         copyRichTitle: "Paste into Word, Gmail or Google Docs with the formatting intact",
+        renderFirst: "Render the preview first to export this note",
     },
 
     // Earlier versions of the open file (HIST-01).

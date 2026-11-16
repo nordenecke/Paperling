@@ -142,6 +142,7 @@ import { formatZoom } from "./utils/zoom";
 import { clearBufferBackups } from "./utils/bufferBackup";
 import { findAnchorLine, splitWikilinkTarget } from "./utils/wikilinkAnchor";
 import { resolveRelativePath } from "./utils/resolveRelativePath";
+import { exceedsPreviewLimit, formatBytes } from "./utils/largeFile";
 import { dirOf, joinPath, lastUsedDirectory, suggestFileName } from "./utils/saveName";
 import { extractHeadings } from "./utils/outline";
 import { errMessage } from "./utils/errors";
@@ -468,6 +469,23 @@ function AppContent() {
   });
 
   const encodingLabel = useEncodingLabel(filePath);
+
+  // Reader size guard (PERF-03). Rendering a multi-megabyte note freezes the
+  // window for a minute or more, so above the limit the Reader shows a size
+  // notice instead and the user opts in explicitly. `fileSize` is exact for
+  // opened files; a brand-new buffer has none, so its length stands in.
+  // The decision lives here, not in the preview, because export/print/copy
+  // capture the preview DOM and must refuse the same documents.
+  const documentBytes = Math.max(fileSize, content.length);
+  const previewOverLimit = exceedsPreviewLimit(documentBytes);
+  // "Render preview anyway" applies to THIS note only: switching tabs clears
+  // it, so the next large file starts guarded again.
+  const [forceLargePreview, setForceLargePreview] = useState(false);
+  useEffect(() => {
+    setForceLargePreview(false);
+  }, [activeTabId]);
+  const previewSuppressed = previewOverLimit && !forceLargePreview;
+  const handleRequestPreview = useCallback(() => setForceLargePreview(true), []);
 
   // On the phone there is no OS open panel (and its SAF result would be
   // unreadable anyway) — "open" means the in-app files browser, rooted at the
@@ -1501,6 +1519,12 @@ function AppContent() {
       showToast("This file is already HTML", "info");
       return;
     }
+    // PERF-03: a suppressed preview holds the size notice, not the document,
+    // so capturing it would export the notice. Say so instead.
+    if (previewSuppressed) {
+      showToast(t("toast.previewNotRendered", { size: formatBytes(documentBytes) }), "info");
+      return;
+    }
     const raw = await getExportHtml();
     if (!raw) {
       showToast(t("exportMenu.nothing"), "error");
@@ -1520,11 +1544,15 @@ function AppContent() {
     } catch (err) {
       showToast(errMessage(err) || "Could not export HTML", "error");
     }
-  }, [fileName, getExportHtml, isHtmlDoc, showToast, theme, font, fontSize, customFont]);
+  }, [fileName, getExportHtml, isHtmlDoc, showToast, theme, font, fontSize, customFont, previewSuppressed, documentBytes]);
 
   // Copy the rendered document, through the same pipeline as export so images
   // are inlined and the app's chrome is stripped. COPY-02.
   const handleCopyDocument = useCallback(async (kind: "rich" | "html") => {
+    if (previewSuppressed) {
+      showToast(t("toast.previewNotRendered", { size: formatBytes(documentBytes) }), "info");
+      return;
+    }
     const raw = await getExportHtml();
     if (!raw) {
       showToast("Nothing to copy yet", "error");
@@ -1539,7 +1567,7 @@ function AppContent() {
     } catch (err) {
       showToast(errMessage(err) || "Could not copy", "error");
     }
-  }, [content, getExportHtml, showToast]);
+  }, [content, getExportHtml, showToast, previewSuppressed, documentBytes]);
 
   // Print the RENDERED document (not the app window): the export pipeline's
   // standalone HTML — which already carries print CSS, KaTeX styles and
@@ -1549,6 +1577,10 @@ function AppContent() {
   const handlePrint = useCallback(async () => {
     if (isHtmlDoc) {
       showToast("Printing isn't available for HTML files yet", "info");
+      return;
+    }
+    if (previewSuppressed) {
+      showToast(t("toast.previewNotRendered", { size: formatBytes(documentBytes) }), "info");
       return;
     }
     const raw = await getExportHtml();
@@ -1579,7 +1611,7 @@ function AppContent() {
     } catch (err) {
       showToast(errMessage(err) || t("toast.couldNotPrint"), "error");
     }
-  }, [customFont, fileName, font, fontSize, getExportHtml, isHtmlDoc, showToast]);
+  }, [customFont, fileName, font, fontSize, getExportHtml, isHtmlDoc, showToast, previewSuppressed, documentBytes]);
 
   // ZOOM-01: say the level whenever it changes, since the shortcut and the
   // wheel have no other visible readout. Skips the initial mount.
@@ -2180,6 +2212,8 @@ function AppContent() {
             onNewFile={handleNewFile}
             getExportHtml={getExportHtml}
             canExport={!isHtmlDoc}
+            exportDisabled={previewSuppressed}
+            exportDisabledReason={t("exportMenu.renderFirst")}
             onCopyDocument={handleCopyDocument}
             onExportSuccess={handleExportSuccess}
             onExportError={handleExportError}
@@ -2436,6 +2470,8 @@ function AppContent() {
                   onNavigateRelative={handleNavigateRelative}
                   onRendered={handlePreviewRendered}
                   onReaderSelection={handleReaderSelection}
+                  previewSuppressed={previewSuppressed}
+                  onRequestPreview={handleRequestPreview}
                 />
                 )}
               </Suspense>

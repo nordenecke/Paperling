@@ -130,6 +130,37 @@ function renderPreview(content: string, extraProps: Record<string, unknown> = {}
     );
 }
 
+describe("large-document notice (PERF-03)", () => {
+    // ~1.4 MB of paragraphs: above the Reader limit, and the point of the
+    // guard is that it is never parsed while suppressed.
+    const big = "# Heading\n\n" + "paragraph text\n\n".repeat(100_000);
+
+    it("shows the notice instead of the body and offers both ways forward", () => {
+        const onRequestPreview = vi.fn();
+        const onEditClick = vi.fn();
+        const { container } = renderPreview(big, { previewSuppressed: true, onRequestPreview, onEditClick });
+
+        // The body was not parsed: no heading made it into the DOM, and the
+        // reading column holds the notice instead.
+        expect(container.querySelector("h1")).toBeNull();
+        expect(container.querySelector(".markdown-body")?.textContent).toContain("too large to preview");
+        expect(screen.getByRole("note")).toBeTruthy();
+        expect(screen.getByText(/1\.5 MB/)).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: /Render preview anyway/i }));
+        fireEvent.click(screen.getByRole("button", { name: /Open source view/i }));
+        expect(onRequestPreview).toHaveBeenCalledTimes(1);
+        expect(onEditClick).toHaveBeenCalledTimes(1);
+    });
+
+    it("renders the body normally when not suppressed", async () => {
+        const { container } = renderPreview("# Small note\n\nBody");
+        await screen.findByText("Small note");
+        expect(container.querySelector("h1")).not.toBeNull();
+        expect(screen.queryByRole("note")).toBeNull();
+    });
+});
+
 describe("optional Reader editing (#213)", () => {
     const original = "---\ntitle: Keep\n---\n\n# Heading\n\nPlain **text**.\n\n```diagram\ngraph TD; A-->B\n```\n";
     function EditablePreview() {
